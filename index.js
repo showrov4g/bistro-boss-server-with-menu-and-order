@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require('stripe')('sk_test_51Qf2e9AVKATRvdeowuRQkx6tRbjYOVucbKAkyt2wSEQ9KLcbyPStUZnITs2kvzaSzKglC2ViSfTesWclYRd42jAz004FUOio9i');
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
@@ -40,7 +41,6 @@ async function run() {
     // middleWares
 
     const verifyToken = (req, res, next) => {
-      console.log("inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: "Forbidden access" });
       }
@@ -69,19 +69,19 @@ async function run() {
       res.send({ admin });
     });
 
-    // verify admin 
-    const verifyAdmin = async (req, res, next)=>{
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
       const email = req.query.email;
-      const query = {email: email}
-      const user = await userCollection.findOne(query)
-      const isAdmin = user?.role === "admin"
-      if(!isAdmin){
-        res.status(403).send({message: "forbidden access"})
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        res.status(403).send({ message: "forbidden access" });
       }
-    }
+    };
 
     //  user data collection
-    app.post("/users",verifyAdmin, async (req, res) => {
+    app.post("/users", verifyAdmin, async (req, res) => {
       const user = req.body;
       // insert email if user isn't exit
       const query = { email: user.email };
@@ -122,14 +122,25 @@ async function run() {
       res.send(result);
     });
 
-    // menu item post 
-    app.post("/menu",verifyToken, verifyAdmin, async(req,res)=>{
+    // menu item post
+    app.post("/menu", verifyToken, verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await menuCollection.insertOne(item);
+      res.send(result);
+    });
+    // menu item delete api
+    app.delete('/menu/:id', async (res, req) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await menuCollection.deleteOne(query);
       res.send(result)
+    });
+    // menu single item get for update 
+    app.get('/menu/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId}
+      const result = await menuCollection.findOne(query);
     })
-    // menu item delete api 
-
 
     app.get("/reviews", async (req, res) => {
       const result = await reviewCollection.find().toArray();
@@ -154,6 +165,25 @@ async function run() {
       const result = await cartCollection.deleteOne(query);
       res.send(result);
     });
+
+    // payment Intent api create 
+    app.post('/create-checkout-session', async(req,res)=>{
+      const {price}= req.body;
+      const amount = parseInt (price * 100)
+      console.log("amount", amount)
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "USD",
+        payment_method_types: ["card"]
+      })
+      res.send({
+        clientSecret : paymentIntent.client_secret
+      })
+    })
+    // payment store api 
+    app.post('/payments', async(req,res)=>{
+      
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
