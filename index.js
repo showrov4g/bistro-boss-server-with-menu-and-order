@@ -30,6 +30,7 @@ async function run() {
     const menuCollection = client.db("BistroBoss").collection("menu");
     const reviewCollection = client.db("bistroDb").collection("reviews");
     const cartCollection = client.db("bistroDb").collection("carts");
+    const paymentCollection = client.db("bistroDb").collection("payments");
     // jaw related api
     app.post("/jwt", async (req, res) => {
       const user = req.body;
@@ -183,6 +184,14 @@ async function run() {
     // payment store api 
     app.post('/payments', async(req,res)=>{
       
+      const payment =req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+      // delete each item form the cart 
+      const query = {_id : {
+        $in: payment.cartIDs.map(id=> new ObjectId(id))
+      }}
+      const deleteResult = await cartCollection.deleteMany(query);
+      res.send({paymentResult, deleteResult})
     })
 
     // Send a ping to confirm a successful connection
